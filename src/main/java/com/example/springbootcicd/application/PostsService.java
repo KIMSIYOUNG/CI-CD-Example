@@ -10,6 +10,7 @@ import com.example.springbootcicd.domain.post.Posts;
 import com.example.springbootcicd.domain.post.PostsRepository;
 import com.example.springbootcicd.web.PostsResponseDto;
 import com.example.springbootcicd.web.PostsSaveRequestDto;
+import javafx.geometry.Pos;
 import lombok.AllArgsConstructor;
 
 @Transactional
@@ -39,6 +40,12 @@ public class PostsService {
         return postsRepository.findALlDesc().stream()
             .map(PostsListResponseDto::new)
             .collect(Collectors.toList());
+    }
+
+    public void delete(Long id) {
+        final Posts posts = postsRepository.findById(id)
+            .orElseThrow(IllegalArgumentException::new);
+        postsRepository.delete(posts);
     }
 
     private Posts find(final Long id) {
