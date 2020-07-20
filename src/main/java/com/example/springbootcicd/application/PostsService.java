@@ -1,5 +1,8 @@
 package com.example.springbootcicd.application;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,13 @@ public class PostsService {
     public PostsResponseDto findById(final Long id) {
         final Posts posts = PostsService.this.find(id);
         return new PostsResponseDto(posts);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PostsListResponseDto> findAllDesc() {
+        return postsRepository.findALlDesc().stream()
+            .map(PostsListResponseDto::new)
+            .collect(Collectors.toList());
     }
 
     private Posts find(final Long id) {
