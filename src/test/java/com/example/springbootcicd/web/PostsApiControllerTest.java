@@ -1,10 +1,14 @@
 package com.example.springbootcicd.web;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,14 +17,34 @@ import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 import com.example.springbootcicd.application.PostsUpdateRequestDto;
 import com.example.springbootcicd.domain.post.Posts;
 import com.example.springbootcicd.domain.post.PostsRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class PostsApiControllerTest {
+    private MockMvc mockMvc;
+
+    @Autowired
+    private WebApplicationContext context;
+
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders
+            .webAppContextSetup(context)
+            .apply(springSecurity())
+            .build();
+        postsRepository.deleteAll();
+    }
 
     @LocalServerPort
     private int port;
@@ -32,7 +56,8 @@ class PostsApiControllerTest {
     private PostsRepository postsRepository;
 
     @Test
-    void create() {
+    @WithMockUser(roles="USER")
+    void create() throws Exception {
         String title = "test_title";
         String content = "test_content";
         final PostsSaveRequestDto request = PostsSaveRequestDto.builder()
@@ -42,18 +67,20 @@ class PostsApiControllerTest {
             .build();
         String url = "http://localhost:" + port + "/api/v1/posts";
 
-        final ResponseEntity<Long> response = restTemplate.postForEntity(url, request, Long.class);
+        mockMvc.perform(post(url)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(new ObjectMapper().writeValueAsString(request)))
+            .andExpect(status().isOk());
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isGreaterThan(0L);
-
-        final List<Posts> posts = postsRepository.findAll();
-        assertThat(posts.get(0).getTitle()).isEqualTo(title);
-        assertThat(posts.get(0).getContent()).isEqualTo(content);
+        //then
+        List<Posts> all = postsRepository.findAll();
+        assertThat(all.get(0).getTitle()).isEqualTo(title);
+        assertThat(all.get(0).getContent()).isEqualTo(content);
     }
 
     @Test
-    void update() {
+    @WithMockUser(roles="USER")
+    void update() throws Exception {
         final Posts savePosts = postsRepository.save(Posts.builder()
             .title("title")
             .content("content")
@@ -71,26 +98,26 @@ class PostsApiControllerTest {
             .build();
 
         String url = "http://localhost:" + port + "/api/v1/posts/" + updateId;
-        final HttpEntity<PostsUpdateRequestDto> requestEntity = new HttpEntity<>(request);
-        final ResponseEntity<Long> response = restTemplate.exchange(url, HttpMethod.PUT, requestEntity, Long.class);
+        mockMvc.perform(put(url)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(new ObjectMapper().writeValueAsString(request)))
+            .andExpect(status().isOk());
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isGreaterThan(0L);
-
-        final List<Posts> all = postsRepository.findAll();
-        assertThat(all.get(0).getTitle()).isEqualTo(expectedTitle);
-        assertThat(all.get(0).getContent()).isEqualTo(expectedContent);
+        //then
+        List<Posts> all = postsRepository.findAll();
+        assertThat(all.get(0).getTitle()).isEqualTo("title2");
+        assertThat(all.get(0).getContent()).isEqualTo("content2");
     }
 
     @Test
     void baseEntity() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now().minusDays(1);
         postsRepository.save(Posts.builder()
             .title("title")
             .content("content")
             .author("author")
             .build());
-        
+
         final List<Posts> postsList = postsRepository.findAll();
 
         assertThat(postsList.get(0).getCreatedAt()).isAfter(now);
